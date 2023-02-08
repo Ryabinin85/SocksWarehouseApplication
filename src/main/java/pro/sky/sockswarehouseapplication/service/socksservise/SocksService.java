@@ -11,7 +11,7 @@ public interface SocksService {
 
     Map<Long, Socks> getAllSocks();
 
-    boolean addSocks(Socks socks);
+    void addSocks(Socks socks);
 
     Map<Long, Socks> getSocksFilteredByMinCotton(Color color, double size, int cottonMin);
 

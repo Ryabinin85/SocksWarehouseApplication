@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import pro.sky.sockswarehouseapplication.exceptions.BadRequestException;
 import pro.sky.sockswarehouseapplication.exceptions.FileProcessingException;
 import pro.sky.sockswarehouseapplication.exceptions.ModelNotFoundException;
 import pro.sky.sockswarehouseapplication.model.socks.Color;
@@ -69,7 +70,10 @@ public class SocksServiceImpl implements SocksService {
 
     @Override
     public Map<Long, Socks> getAllSocks() {
-        return socksMap;
+        if (socksMap.isEmpty()) {
+            throw new ModelNotFoundException("Носки на складе отсутствуют");
+        } else
+            return socksMap;
     }
 
     private void checkRequest(Socks socks) {
@@ -77,25 +81,25 @@ public class SocksServiceImpl implements SocksService {
         boolean sizeMatch = Arrays.stream(SocksSize.values()).anyMatch(size -> size.equals(socks.getSize()));
 
         if (!colorMatch) {
-            throw new ModelNotFoundException("Такого цвета нет");
+            throw new BadRequestException("Такого цвета нет");
         }
 
         if (!sizeMatch) {
-            throw new ModelNotFoundException("Такого размера нет");
+            throw new BadRequestException("Такого размера нет");
         }
 
         if (socks.getQuantity() <= 0) {
-            throw new ModelNotFoundException("Количество должно быть больше нуля");
+            throw new BadRequestException("Количество должно быть больше нуля");
         }
 
         if (socks.getCottonPart() < 0 || socks.getCottonPart() > 100) {
-            throw new ModelNotFoundException("Значение хлопка должно быть от 0 до 100");
+            throw new BadRequestException("Значение хлопка должно быть от 0 до 100");
         }
 
     }
 
     @Override
-    public boolean addSocks(Socks addedSocks) {
+    public void addSocks(Socks addedSocks) {
         checkRequest(addedSocks);
         transactionsService.addTransactions(TransactionsType.INCOMING, LocalDateTime.now(), addedSocks);
 
@@ -110,11 +114,12 @@ public class SocksServiceImpl implements SocksService {
                 }
             }
         saveToFile(dataFileName, socksMap, id);
-        return true;
     }
 
     @Override
     public Map<Long, Socks> getSocksFilteredByMinCotton(Color color, double size, int cottonMin) {
+
+        checkRequest(new Socks(color, SocksSize.getSize(size), cottonMin, 1) );
 
         Map<Long, Socks> collect = socksMap.entrySet().stream()
                 .filter(o -> o.getValue().getColor().equals(color))
@@ -132,6 +137,8 @@ public class SocksServiceImpl implements SocksService {
 
     @Override
     public Map<Long, Socks> getSocksFilteredByMaxCotton(Color color, double size, int cottonMax) {
+
+        checkRequest(new Socks(color, SocksSize.getSize(size), cottonMax, 1) );
 
         Map<Long, Socks> collect = socksMap.entrySet().stream()
                 .filter(o -> o.getValue().getColor().equals(color))
@@ -218,7 +225,7 @@ public class SocksServiceImpl implements SocksService {
             String json = new ObjectMapper().writeValueAsString(dataFile);
             filesService.saveToFile(json, dataFileName);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new FileProcessingException("Неверный запрос");
         }
     }
 
@@ -232,7 +239,7 @@ public class SocksServiceImpl implements SocksService {
         } catch (MismatchedInputException e) {
             e.getMessage();
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new FileProcessingException("Неверный запрос");
         }
     }
 
@@ -246,7 +253,7 @@ public class SocksServiceImpl implements SocksService {
         } catch (MismatchedInputException e) {
             e.getMessage();
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new FileProcessingException("Неверный запрос");
         }
     }
 

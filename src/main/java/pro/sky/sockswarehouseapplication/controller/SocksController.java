@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import pro.sky.sockswarehouseapplication.exceptions.ModelNotFoundException;
 import pro.sky.sockswarehouseapplication.model.socks.Color;
 import pro.sky.sockswarehouseapplication.model.socks.Socks;
 import pro.sky.sockswarehouseapplication.service.socksservise.SocksService;
@@ -33,9 +32,7 @@ public class SocksController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Список всех носков получен")})
     public ResponseEntity<Map<Long, Socks>> getSocks() {
-        if (socksService.getAllSocks().isEmpty()) {
-            throw new ModelNotFoundException("Носки на складе отсутствуют");
-        } else return ResponseEntity.ok(socksService.getAllSocks());
+        return ResponseEntity.ok(socksService.getAllSocks());
     }
 
     @GetMapping(value = "/cottonmin", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -78,11 +75,10 @@ public class SocksController {
             @ApiResponse(responseCode = "200", description = "Носки добавлены")})
     public ResponseEntity<Void> addSocks(@RequestBody Socks socks) {
 
-        if (socksService.addSocks(socks)) {
-            return ResponseEntity.ok().build();
-        } else
-            throw new ModelNotFoundException("Некорректный ввод данных");
+        socksService.addSocks(socks);
+        return ResponseEntity.ok().build();
     }
+
 
     @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Выдача ноcков")
