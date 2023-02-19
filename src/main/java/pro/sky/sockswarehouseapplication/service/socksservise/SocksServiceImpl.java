@@ -17,6 +17,7 @@ import pro.sky.sockswarehouseapplication.model.socks.Color;
 import pro.sky.sockswarehouseapplication.model.socks.Socks;
 import pro.sky.sockswarehouseapplication.model.socks.SocksSize;
 import pro.sky.sockswarehouseapplication.model.transactions.TransactionsType;
+import pro.sky.sockswarehouseapplication.dao.SocksDAO;
 import pro.sky.sockswarehouseapplication.service.fileservice.FilesService;
 import pro.sky.sockswarehouseapplication.service.transactionsservice.TransactionsService;
 
@@ -33,7 +34,14 @@ public class SocksServiceImpl implements SocksService {
     private final FilesService filesService;
     private final TransactionsService transactionsService;
 
+    private final SocksDAO socksDAO;
+
     private static Map<Long, Socks> socksMap = new LinkedHashMap<>();
+
+    public static Map<Long, Socks> getSocksMap() {
+        return socksMap;
+    }
+
     private static Map<Long, Socks> defectiveSocksMap = new LinkedHashMap<>();
 
     private static Long id = 0L;
@@ -46,9 +54,12 @@ public class SocksServiceImpl implements SocksService {
     @Value("${name.of.defectivesocks.data.file}")
     private String defectiveSocksDataFileName;
 
-    public SocksServiceImpl(FilesService filesService, TransactionsService transactionsService) {
+    public SocksServiceImpl(FilesService filesService,
+                            TransactionsService transactionsService,
+                            SocksDAO socksDAO) {
         this.filesService = filesService;
         this.transactionsService = transactionsService;
+        this.socksDAO = socksDAO;
     }
 
     @PostConstruct
@@ -101,25 +112,30 @@ public class SocksServiceImpl implements SocksService {
     @Override
     public void addSocks(Socks addedSocks) {
         checkRequest(addedSocks);
-        transactionsService.addTransactions(TransactionsType.INCOMING, LocalDateTime.now(), addedSocks);
 
         if (socksMap.isEmpty() || !socksMap.containsValue(addedSocks)) {
+            addedSocks.setId(id);
             socksMap.put(id++, addedSocks);
+            socksDAO.save(addedSocks);
+            transactionsService.addTransactions(TransactionsType.INCOMING, LocalDateTime.now(), addedSocks);
 
-        } else
+        } else {
             for (Socks socks : socksMap.values()) {
                 if (socks.equals(addedSocks)) {
                     socks.setQuantity(socks.getQuantity() + addedSocks.getQuantity());
+                    socksDAO.update(socks, socks.getId());
+                    transactionsService.addTransactions(TransactionsType.INCOMING, LocalDateTime.now(), socks);
                     break;
                 }
             }
+        }
         saveToFile(dataFileName, socksMap, id);
     }
 
     @Override
     public Map<Long, Socks> getSocksFilteredByMinCotton(Color color, double size, int cottonMin) {
 
-        checkRequest(new Socks(color, SocksSize.getSize(size), cottonMin, 1) );
+        checkRequest(new Socks(color, SocksSize.getSize(size), cottonMin, 1));
 
         Map<Long, Socks> collect = socksMap.entrySet().stream()
                 .filter(o -> o.getValue().getColor().equals(color))
@@ -138,7 +154,7 @@ public class SocksServiceImpl implements SocksService {
     @Override
     public Map<Long, Socks> getSocksFilteredByMaxCotton(Color color, double size, int cottonMax) {
 
-        checkRequest(new Socks(color, SocksSize.getSize(size), cottonMax, 1) );
+        checkRequest(new Socks(color, SocksSize.getSize(size), cottonMax, 1));
 
         Map<Long, Socks> collect = socksMap.entrySet().stream()
                 .filter(o -> o.getValue().getColor().equals(color))
@@ -165,9 +181,10 @@ public class SocksServiceImpl implements SocksService {
             for (Socks socks : socksMap.values()) {
                 if (socks.equals(releaseSocks) && socks.getQuantity() >= releaseSocks.getQuantity()) {
                     socks.setQuantity(socks.getQuantity() - releaseSocks.getQuantity());
+                    socksDAO.update(socks, socks.getId());
                     flag = true;
                     saveToFile(dataFileName, socksMap, id);
-                    transactionsService.addTransactions(TransactionsType.OUTGOING, LocalDateTime.now(), releaseSocks);
+                    transactionsService.addTransactions(TransactionsType.OUTGOING, LocalDateTime.now(), socks);
                     break;
                 } else if (socks.equals(releaseSocks) && socks.getQuantity() <= releaseSocks.getQuantity()) {
                     count = socks.getQuantity();
@@ -191,6 +208,8 @@ public class SocksServiceImpl implements SocksService {
                 if (socks.equals(defectiveSocks) && socks.getQuantity() >= defectiveSocks.getQuantity()) {
                     socks.setQuantity(socks.getQuantity() - defectiveSocks.getQuantity());
                     flag = true;
+                    socksDAO.update(socks, socks.getId());
+                    transactionsService.addTransactions(TransactionsType.WRITE_OFF, LocalDateTime.now(), socks);
                     saveToFile(dataFileName, socksMap, id);
                     addDefectiveSocks(defectiveSocks);
                     break;
@@ -216,7 +235,6 @@ public class SocksServiceImpl implements SocksService {
             defectiveSocksMap.put(defectiveId++, defectiveSocks);
         }
         saveToFile(defectiveSocksDataFileName, defectiveSocksMap, defectiveId);
-        transactionsService.addTransactions(TransactionsType.WRITE_OFF, LocalDateTime.now(), defectiveSocks);
     }
 
     private void saveToFile(String dataFileName, Map<Long, Socks> socksMap, long id) {
