@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import pro.sky.sockswarehouseapplication.dao.TransactionsDAO;
 import pro.sky.sockswarehouseapplication.exceptions.FileProcessingException;
 import pro.sky.sockswarehouseapplication.model.socks.Socks;
 import pro.sky.sockswarehouseapplication.model.transactions.Transactions;
@@ -34,13 +35,16 @@ public class TransactionsServiceImpl implements TransactionsService {
     @Value("${name.of.transactions.data.file}")
     private String dataFileName;
     private final FilesService filesService;
+    private final TransactionsDAO transactionsDAO;
 
     private static Map<Long, Transactions> transactionsMap = new LinkedHashMap<>();
 
     private static Long id = 0L;
 
-    public TransactionsServiceImpl(FilesService filesService) {
+    public TransactionsServiceImpl(FilesService filesService,
+                                   TransactionsDAO transactionsDAO) {
         this.filesService = filesService;
+        this.transactionsDAO = transactionsDAO;
     }
 
     @PostConstruct
@@ -56,8 +60,10 @@ public class TransactionsServiceImpl implements TransactionsService {
     @Override
     public void addTransactions(TransactionsType type, LocalDateTime time, Socks socks) {
         Socks newSock = new Socks(socks.getColor(), socks.getSize(), socks.getCottonPart(), socks.getQuantity());
+        newSock.setId(socks.getId());
         Transactions transactions = new Transactions(type, time, newSock);
         transactionsMap.put(id++, transactions);
+        transactionsDAO.save(transactions);
         saveToFile(dataFileName, transactionsMap);
     }
 
@@ -73,7 +79,7 @@ public class TransactionsServiceImpl implements TransactionsService {
                         .append(transactions.getValue().getType().name())
                         .append(", Время: ")
                         .append(transactions.getValue().getTime().format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss")))
-                        .append(", Количество: ")
+                        .append(", Остаток на складе: ")
                         .append(String.valueOf(transactions.getValue().getSocks().getQuantity()))
                         .append(", Размер: ")
                         .append(transactions.getValue().getSocks().getSize().name())

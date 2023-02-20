@@ -2,30 +2,50 @@ package pro.sky.sockswarehouseapplication.model.socks;
 
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import javax.persistence.*;
 import javax.validation.constraints.PositiveOrZero;
-import javax.validation.constraints.Size;
 import java.util.Objects;
 
 
+@Entity
+@Table(name = "socks")
+@Access(value = AccessType.FIELD)
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Socks {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private long id;
+
+    @Column(name = "color")
+    @Enumerated(EnumType.STRING)
     private Color color;
+
+    @Column(name = "size")
+    @Enumerated(EnumType.STRING)
     private SocksSize size;
 
-    @Size(max = 100)
+    @Column(name = "cotton_part")
+//    @Size(max = 100)
     private int cottonPart;
 
+    @Column(name = "quantity")
     @PositiveOrZero(message = "Количество должно быть больше нуля")
     private int quantity;
 
+
+    public Socks(Color color, SocksSize size, int cottonPart, int quantity) {
+        this.color = color;
+        this.size = size;
+        this.cottonPart = cottonPart;
+        this.quantity = quantity;
+    }
 
     @Override
     public boolean equals(Object o) {
